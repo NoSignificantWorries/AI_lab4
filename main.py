@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import src.nodes.nodes as nn
+import src.functional.functional as F
 
 
 def unpickle(filepath: str) -> dict:
@@ -39,13 +40,21 @@ def main() -> None:
     test_batch_data = test_batch_data / 255
     print(test_batch_data.shape)
     
-    model = Model()
+    batch = test_batch_data[:2]
+    
+    batch = batch - batch.min()
+    batch = batch / batch.max()
+    
+    pool = nn.MaxPoolling((2, 2), (0, 0), (2, 2))
+    pooled_batch = pool(batch)
+    back_batch = pool.back(pooled_batch)
 
-    print(model(test_batch_data[:5]).shape)
+    fig, ax = plt.subplots(nrows=2, ncols=2)
     
-    fig, ax = plt.subplots(nrows=1, ncols=2)
-    
-    ax[0].imshow(test_batch_data[0])
+    ax[0][0].imshow(test_batch_data[0])
+    ax[0][1].imshow(test_batch_data[1])
+    ax[1][0].imshow(back_batch[0])
+    ax[1][1].imshow(back_batch[1])
 
     plt.savefig("sample.png")
 
