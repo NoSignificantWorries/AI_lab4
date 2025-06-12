@@ -1,9 +1,37 @@
+import pickle
+
 import numpy as np
 
 import src.nodes.nodes as nn
 
 
-class XOR:
+class BaseModel:
+    def forward(self):
+        raise NotImplementedError("ERROR: Forward not implemented!")
+    
+    def backward(self):
+        raise NotImplementedError("ERROR: Backward not implemented!")
+
+    def parameters(self):
+        raise NotImplementedError("ERROR: parameters not implemented!")
+    
+    def gradients(self):
+        raise NotImplementedError("ERROR: gradients not implemented!")
+        
+    def update_params(self):
+        raise NotImplementedError("ERROR: update_params not implemented!")
+        
+    def zero_grad(self):
+        raise NotImplementedError("ERROR: zero_grad not implemented!")
+    
+    def save(self):
+        raise NotImplementedError("ERROR: save not implemented")
+    
+    def load(self):
+        raise NotImplementedError("ERROR: load not implemented")
+
+
+class XOR(BaseModel):
     def __init__(self, eval: bool = False):
         self.eval = eval
 
@@ -43,7 +71,7 @@ class XOR:
         self.fc2.zero_grad()
 
 
-class Conv:
+class Conv(BaseModel):
     def __init__(self, eval: bool = False):
         self.eval = eval
 
@@ -89,7 +117,7 @@ class Conv:
         self.cv2.zero_grad()
 
 
-class CNNSmall:
+class CNNSmall(BaseModel):
     def __init__(self, eval: bool = False):
         self.eval = eval
 
@@ -176,3 +204,25 @@ class CNNSmall:
         self.bn2.zero_grad()
         self.fc1.zero_grad()
         self.fc2.zero_grad()
+    
+    def save(self, filepath: str) -> None:
+        params = {
+            b"cv1": self.cv1.parameters(),
+            b"bn1": self.bn1.parameters(),
+            b"cv2": self.cv2.parameters(),
+            b"bn2": self.bn2.parameters(),
+            b"fc1": self.fc1.parameters(),
+            b"fc2": self.fc2.parameters()
+        }
+        with open(filepath, "wb") as f:
+            pickle.dump(params, f)
+    
+    def load(self, filepath: str) -> None:
+        with open(filepath, "rb") as f:
+            params = pickle.load(f)
+        self.cv1.update_params(*params[b"cv1"])
+        self.bn1.update_params(*params[b"bn1"])
+        self.cv2.update_params(*params[b"cv2"])
+        self.bn2.update_params(*params[b"bn2"])
+        self.fc1.update_params(*params[b"fc1"])
+        self.fc2.update_params(*params[b"fc2"])

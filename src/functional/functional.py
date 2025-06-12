@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 
 
@@ -86,3 +88,76 @@ def CNG(w, f, epsilon=1e-6):
         it.iternext()
     
     return grad
+
+
+def unpickle(filepath: str) -> dict:
+    with open(filepath, "rb") as f:
+        meta = pickle.load(f, encoding="bytes")
+    return meta
+
+
+def BatchOHE(data: np.ndarray, batch_size: int, num_classes: int) -> np.ndarray:
+    one_hot = np.zeros((batch_size, num_classes), dtype=np.float64)
+    one_hot[np.arange(batch_size), data] = 1
+
+    return one_hot
+
+
+def OHE_to_indeces(one_hot: np.ndarray) -> np.ndarray:
+    return np.argmax(one_hot, axis=-1)
+
+
+def calculate_TP_TN_FP_FN(y_true: np.ndarray, y_pred: np.ndarray, num_classes: int) -> list:
+    metrics = []
+    for i in range(num_classes):
+        TP = np.sum((y_true == i) & (y_pred == i))
+        TN = np.sum((y_true != i) & (y_pred != i))
+        FP = np.sum((y_true != i) & (y_pred == i))
+        FN = np.sum((y_true == i) & (y_pred != i))
+        metrics.append((int(TP), int(TN), int(FP), int(FN)))
+    return metrics
+
+
+def calculate_metrics(TP: int, TN: int, FP: int, FN: int) -> tuple[int, int, int, int]:
+    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+    recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    accuracy = (TP + TN) / (TP + TN + FP + FN) if (TP + TN + FP + FN) > 0 else 0
+    return precision, recall, f1, accuracy
+
+
+def calculate_running_metrics(running_metrics, y_true, y_pred, num_classes):
+    metrics = calculate_TP_TN_FP_FN(y_true, y_pred, num_classes)
+    for i, (TP, TN, FP, FN) in enumerate(metrics):
+        running_metrics[i][0] += TP
+        running_metrics[i][1] += TN
+        running_metrics[i][2] += FP
+        running_metrics[i][3] += FN
+
+    return running_metrics
+
+
+def calculate_aggregated_metrics(metrics: list[tuple[int, int, int, int]]) -> tuple[float, float, float]:
+    num_classes = len(metrics)
+
+    # Macro-average
+    macro_precision = np.mean([calculate_metrics(*metrics[i])[0] for i in range(num_classes)])
+    macro_recall = np.mean([calculate_metrics(*metrics[i])[1] for i in range(num_classes)])
+    macro_f1 = np.mean([calculate_metrics(*metrics[i])[2] for i in range(num_classes)])
+    
+    # Micro-average
+    total_tp = sum([metrics[i][0] for i in range(num_classes)])
+    total_fp = sum([metrics[i][2] for i in range(num_classes)])
+    total_fn = sum([metrics[i][3] for i in range(num_classes)])
+    micro_precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
+    micro_recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
+    micro_f1 = 2 * (micro_precision * micro_recall) / (micro_precision + micro_recall) if (micro_precision + micro_recall) > 0 else 0
+
+    # Weighted-average
+    '''
+    weighted_precision = np.sum([calculate_metrics(*metrics[i])[0] * num_samples_per_class[i] for i in range(num_classes)]) / np.sum(num_samples_per_class)
+    weighted_recall = np.sum([calculate_metrics(*metrics[i])[1] * num_samples_per_class[i] for i in range(num_classes)]) / np.sum(num_samples_per_class)
+    weighted_f1 = np.sum([calculate_metrics(*metrics[i])[2] * num_samples_per_class[i] for i in range(num_classes)]) / np.sum(num_samples_per_class)
+    '''
+    
+    return macro_precision, macro_recall, macro_f1
