@@ -132,14 +132,12 @@ class Conv(Layer):
         if self.eval:
             return dloss_dout
 
-        m = dloss_dout.shape[0]
-
         self.db = np.sum(dloss_dout, axis=(0, 1, 2))
         
         Bs, Nh, Nw, Cout = dloss_dout.shape
         dloss_dout_r = dloss_dout.reshape((Bs, Nh * Nw, Cout))
         
-        self.dK = np.dot(self.BatchCols, dloss_dout_r)
+        self.dK = self.BatchCols @ dloss_dout_r
         self.dK = np.sum(self.dK, axis=0)
 
         dBatchColsT = np.dot(dloss_dout_r, self.kernel.T)
@@ -149,7 +147,6 @@ class Conv(Layer):
         dbatch = dpadded_batch[:, self.Ph:self.batch_shape[1] - self.Ph, self.Pw:self.batch_shape[2] - self.Pw, :]
 
         return dbatch
-
 
     def update_params(self, Kin: np.ndarray, b_in: np.ndarray) -> None:
         self.kernel = Kin
@@ -167,7 +164,66 @@ class Conv(Layer):
 
 
 class BatchNorm(Layer):
-    pass
+    def __init__(self, num_features: int, momentum: float = 0.9, epsilon: float = 1e-15, eval: bool = False):
+        self.eval = False
+        self.momentum = momentum
+        self.epsilon = epsilon
+        self.gamma = np.ones(num_features, dtype=np.float64)
+        self.beta = np.zeros(num_features, dtype=np.float64)
+        self.running_var = np.ones(num_features, dtype=np.float64)
+        self.running_mean = np.zeros(num_features, dtype=np.float64)
+        self.cache = None
+        self.dgamma = None
+        self.dbeta = None
+    
+    def __call__(self, batch: np.ndarray) -> np.ndarray:
+        if not self.eval:
+            mean = np.mean(batch, axis=(0, 1, 2))
+            var = np.var(batch, axis=(0, 1, 2))
+
+            x_hat = (batch - mean[None, None, None, :]) / np.sqrt(var[None, None, None, :] + self.epsilon)
+
+            out = self.gamma[None, None, None, :] * x_hat + self.beta[None, None, None, :]
+
+            self.running_mean = self.momentum * self.running_mean + (1 - self.momentum) * mean
+            self.running_var = self.momentum * self.running_var + (1 - self.momentum) * var
+
+            self.cache = (batch, mean, var, x_hat)
+        else:
+            x_hat = (batch - self.running_mean[None, None, None, :]) / np.sqrt(self.running_var[None, None, None, :] + self.epsilon)
+            out = self.gamma[None, None, None, :] * x_hat + self.beta[None, None, None, :]
+
+        return out
+    
+    def back(self, dloss_dout: np.ndarray) -> np.ndarray:
+        x, mean, var, x_hat = self.cache
+        batch_size = np.prod(x.shape[:-1])
+
+        self.dgamma = np.sum(dloss_dout * x_hat, axis=(0, 1, 2))  # Суммируем все, кроме Cin
+        self.dbeta = np.sum(dloss_dout, axis=(0, 1, 2))      # Суммируем все, кроме Cin
+
+        dx_hat = dloss_dout * self.gamma[None, None, None, :] #Добавили broadcasting
+        dvar = np.sum(dx_hat * (x - mean[None, None, None, :]) * (-0.5) * (var[None, None, None, :] + self.epsilon)**(-1.5), axis=(0, 1, 2))
+        dmean = np.sum(dx_hat * (-1) / np.sqrt(var[None, None, None, :] + self.epsilon), axis=(0, 1, 2)) + \
+                dvar * np.sum(-2 * (x - mean[None, None, None, :]), axis=(0, 1, 2)) / batch_size
+
+        dx = dx_hat / np.sqrt(var[None, None, None, :] + self.epsilon) + dvar * 2 * (x - mean[None, None, None, :]) / batch_size + dmean / batch_size
+
+        return dx
+
+    def update_params(self, gamma_in: np.ndarray, beta_in: np.ndarray) -> None:
+        self.gamma = gamma_in
+        self.beta = beta_in
+        
+    def zero_grad(self) -> None:
+        self.dgamma = np.zeros_like(self.gamma)
+        self.dbeta = np.zeros_like(self.beta)
+    
+    def parameters(self) -> tuple:
+        return self.gamma, self.beta
+    
+    def gradients(self) -> tuple:
+        return self.dgamma, self.dbeta
 
 
 class MaxPoolling(Layer):
@@ -262,7 +318,7 @@ class Fc(Layer):
     def __call__(self, X: np.ndarray) -> np.ndarray:
         if not self.eval:
             self.X = X
-        res = np.dot(self.W, X) + self.bias
+        res = np.dot(self.W, X.T) + self.bias[:, None]
         return res.T
     
     def back(self, dloss_dout: np.ndarray) -> np.ndarray:
@@ -270,11 +326,10 @@ class Fc(Layer):
             return dloss_dout
 
         if not self.eval:
-            m = dloss_dout.shape[0]
-            self.dW = np.dot(dloss_dout.T, self.X.T)
-            self.db = np.sum(dloss_dout.T, axis=1, keepdims=True).T
+            self.dW = np.dot(dloss_dout.T, self.X)
+            self.db = np.sum(dloss_dout, axis=0).T
 
-        dX = np.dot(self.W.T, dloss_dout.T)
+        dX = np.dot(dloss_dout, self.W)
         
         return dX
     

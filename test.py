@@ -36,8 +36,6 @@ if __name__ == "__main__":
     tr = np.array([[[[1, 2, 3]] * 4] * 4], dtype=np.float64)
     print(tr.shape)
 
-    model = m.Conv()
-
-    pred = model.forward(tr)
-    print("pred:", pred.shape)
-    print(model.backward(pred).shape)
+    lt = np.array([[[0], [1], [0], [0]], [[1], [1], [0], [1]]], dtype=np.float64)
+    pt = np.array([[[1], [0], [0], [0]], [[1], [0], [1], [1]]], dtype=np.float64)
+    print(loss.CEL(lt, pt))

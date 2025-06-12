@@ -63,3 +63,26 @@ def sigmoid(data: np.ndarray) -> np.ndarray:
 def softmax(data: np.ndarray) -> np.ndarray:
     exp_data = np.exp(data - np.max(data, axis=-1, keepdims=True))
     return exp_data / np.sum(exp_data, axis=-1, keepdims=True)
+
+
+def CNG(w, f, epsilon=1e-6):
+    # Compute Numerical Gradient
+    grad = np.zeros_like(w)
+    it = np.nditer(w, flags=["multi_index"], op_flags=["readwrite"])
+
+    while not it.finished:
+        ix = it.multi_index
+        old_value = w[ix]
+
+        w[ix] = old_value + epsilon
+        pos = f(w)
+
+        w[ix] = old_value - epsilon
+        neg = f(w)
+
+        w[ix] = old_value
+
+        grad[ix] = (pos - neg) / (2 * epsilon)
+        it.iternext()
+    
+    return grad
