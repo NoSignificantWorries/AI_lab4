@@ -92,10 +92,10 @@ def train(model: M.BaseModel, criterion, optimizer, dataloaders: dict, num_epoch
                     })
                     pbar.update(1)
             
-            results[phase]["loss"].append(loss)
-            results[phase]["mAP"].append(loss)
-            results[phase]["mAR"].append(loss)
-            results[phase]["mAF1"].append(loss)
+            results[phase]["loss"].append(epoch_loss)
+            results[phase]["mAP"].append(mAP)
+            results[phase]["mAR"].append(mAR)
+            results[phase]["mAF1"].append(mAF1)
             
             with open(os.path.join(save_path, "results.json"), "w") as file:
                 json.dump(results, file)
@@ -109,7 +109,7 @@ def train(model: M.BaseModel, criterion, optimizer, dataloaders: dict, num_epoch
 
 
 def main() -> None:
-    batch_size = 64
+    batch_size = 128
 
     data_dir = "data"
     train_data, train_labels = unpickle_all(data_dir, ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5"])
@@ -122,10 +122,10 @@ def main() -> None:
                    "val": data.DataLoader(datasets["val"], batch_size=batch_size)}
     
     model = M.CNNSmall()
-    model.load("runs/12062025_1602/weights/model_5.plk")
+    model.load("runs/13062025_0932/weights/model_9.plk")
     optimizer = optim.SGD(0.01)
     
-    train(model, criterion.CEL, optimizer, dataloaders, 10, "runs", 5)
+    train(model, criterion.CEL, optimizer, dataloaders, 15, "runs", 3)
 
 
 if __name__ == "__main__":
