@@ -199,10 +199,10 @@ class BatchNorm(Layer):
         x, mean, var, x_hat = self.cache
         batch_size = np.prod(x.shape[:-1])
 
-        self.dgamma = np.sum(dloss_dout * x_hat, axis=(0, 1, 2))  # Суммируем все, кроме Cin
-        self.dbeta = np.sum(dloss_dout, axis=(0, 1, 2))      # Суммируем все, кроме Cin
+        self.dgamma = np.sum(dloss_dout * x_hat, axis=(0, 1, 2))
+        self.dbeta = np.sum(dloss_dout, axis=(0, 1, 2))
 
-        dx_hat = dloss_dout * self.gamma[None, None, None, :] #Добавили broadcasting
+        dx_hat = dloss_dout * self.gamma[None, None, None, :]
         dvar = np.sum(dx_hat * (x - mean[None, None, None, :]) * (-0.5) * (var[None, None, None, :] + self.epsilon)**(-1.5), axis=(0, 1, 2))
         dmean = np.sum(dx_hat * (-1) / np.sqrt(var[None, None, None, :] + self.epsilon), axis=(0, 1, 2)) + \
                 dvar * np.sum(-2 * (x - mean[None, None, None, :]), axis=(0, 1, 2)) / batch_size
